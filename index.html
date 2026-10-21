@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QQ飞车 3D 官方复刻版 - 十一城</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        #webgl-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 经典 QQ 飞车 UI 风格 */
+        .hud-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* 顶部计时与圈数 */
+        .top-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 25px;
+            background: rgba(10, 15, 30, 0.75);
+            border: 2px solid #00d2d3;
+            box-shadow: 0 0 15px rgba(0, 210, 211, 0.5);
+            border-radius: 30px;
+            padding: 8px 30px;
+            color: #fff;
+            align-items: center;
+        }
+        .time-box, .lap-box {
+            font-size: 24px;
+            font-weight: 900;
+            font-style: italic;
+            text-shadow: 0 0 10px #00d2d3;
+            letter-spacing: 2px;
+        }
+        .time-label {
+            font-size: 12px;
+            color: #54a0ff;
+            margin-right: 6px;
+        }
+
+        /* 经典技巧飘字 (CWW喷、双喷、漂移) */
+        #skill-alert {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 38px;
+            font-weight: 900;
+            font-style: italic;
+            color: #ffd32a;
+            text-shadow: 0 0 20px #ff3f34, 0 0 10px #ff9f1a;
+            opacity: 0;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            letter-spacing: 3px;
+        }
+
+        /* 右下角极速仪表盘与氮气槽 (QQ飞车灵魂组件) */
+        .speedometer-wrap {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            width: 260px;
+            height: 160px;
+            background: radial-gradient(circle at bottom, rgba(16, 24, 48, 0.95), rgba(5, 8, 18, 0.8));
+            border-radius: 20px 20px 0 0;
+            border-top: 3px solid #ff9f43;
+            box-shadow: 0 -5px 25px rgba(255, 159, 67, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 15px;
+        }
+        .speed-number {
+            font-size: 64px;
+            font-weight: 900;
+            font-style: italic;
+            color: #ff9f43;
+            text-shadow: 0 0 15px #ee5253;
+            line-height: 1;
+        }
+        .speed-unit {
+            font-size: 14px;
+            color: #8395a7;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        /* 氮气集气槽 (N2O Gauge) */
+        .nitro-bar-container {
+            width: 85%;
+            height: 18px;
+            background: #222f3e;
+            border-radius: 9px;
+            overflow: hidden;
+            border: 2px solid #576574;
+            position: relative;
+        }
+        .nitro-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00d2d3, #54a0ff, #ee5253);
+            border-radius: 7px;
+            box-shadow: 0 0 12px #54a0ff;
+            transition: width 0.05s linear;
+        }
+        .nitro-card-slots {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .nitro-slot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #222f3e;
+            border: 2px solid #576574;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #fff;
+            transition: all 0.2s;
+        }
+        .nitro-slot.ready {
+            background: linear-gradient(135deg, #ff9f43, #ee5253);
+            border-color: #ffd32a;
+            box-shadow: 0 0 15px #ee5253;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        /* 左下角小地图与按键指引 */
+        .controls-hint {
+            position: absolute;
+            bottom: 30px;
+            left: 40px;
+            background: rgba(10, 15, 30, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 15px 20px;
+            color: #c8d6e5;
+            font-size: 13px;
+            line-height: 1.8;
+            backdrop-filter: blur(8px);
+        }
+        .key-badge {
+            background: #341f97;
+            color: #fff;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            border: 1px solid #5f27cd;
+        }
+
+        /* 倒计时与开场欢迎 */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            pointer-events: auto;
+            z-index: 999;
+        }
+        .btn-start {
+            margin-top: 25px;
+            padding: 16px 50px;
+            font-size: 22px;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(90deg, #ff9f43, #ee5253);
+            border: none;
+            border-radius: 35px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(238, 82, 83, 0.7);
+            transition: all 0.2s;
+            letter-spacing: 2px;
+        }
+        .btn-start:hover {
+            transform: scale(1.06);
+            box-shadow: 0 0 35px rgba(255, 159, 67, 1);
+        }
+
+        /* 移动端触屏虚拟按键支持 (手机/平板也能畅玩) */
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: none;
+            justify-content: space-between;
+            padding: 0 30px;
+            pointer-events: auto;
+        }
+        .touch-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            font-size: 20px;
+            backdrop-filter: blur(5px);
+        }
+        @media (max-width: 768px) {
+            .mobile-controls { display: flex; }
+            .controls-hint { display: none; }
+            .speedometer-wrap { right: 15px; bottom: 100px; transform: scale(0.85); transform-origin: bottom right; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="webgl-canvas"></canvas>
+
+    <div class="hud-container">
+        <!-- 顶部信息 -->
+        <div class="top-bar">
+            <div class="lap-box"><span class="time-label">LAP</span> 1 / 3</div>
+            <div class="time-box"><span class="time-label">TIME</span> <span id="time-display">00:00.00</span></div>
+        </div>
+
+        <!-- 技巧触发浮字 -->
+        <div id="skill-alert">⚡ 经典双喷 (Double Boost)</div>
+
+        <!-- 键位指引 -->
+        <div class="controls-hint">
+            <div style="font-weight: 900; color: #ff9f43; margin-bottom: 5px;">🎮 经典操作指引</div>
+            <div><span class="key-badge">↑ / W</span> 油门加速 / 释放小喷</div>
+            <div><span class="key-badge">← → / A D</span> 方向转向</div>
+            <div><span class="key-badge">Shift</span> 漂移过弯与集气</div>
+            <div><span class="key-badge">Ctrl / 空格</span> 释放大喷 (N2O)</div>
+            <div style="color: #48dbfb; margin-top: 5px; font-size: 11px;">★ 高级连招：漂移出弯 → 迅速按 ↑ 触发双喷 / CWW喷！</div>
+        </div>
+
+        <!-- 右侧仪表盘与氮气 -->
+        <div class="speedometer-wrap">
+            <div class="speed-number" id="speed-text">0</div>
+            <div class="speed-unit">KM / H</div>
+
+            <!-- 氮气槽 -->
+            <div class="nitro-bar-container">
+                <div class="nitro-bar-fill" id="nitro-fill"></div>
+            </div>
+
+            <!-- 氮气卡槽点数 -->
+            <div class="nitro-card-slots">
+                <div class="nitro-slot ready" id="slot-0">🚀</div>
+                <div class="nitro-slot" id="slot-1">🚀</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏启动层 -->
+    <div id="start-overlay">
+        <h1 style="font-size: 48px; font-style: italic; font-weight: 900; text-shadow: 0 0 25px #00d2d3;">QQ飞车 3D 官方复刻</h1>
+        <p style="margin-top: 10px; color: #a4b0be; font-size: 18px;">经典赛道【十一城】· 真实漂移物理与双喷/CWW集气</p>
+        <button class="btn-start" id="start-btn">立即发车 🏁</button>
+    </div>
+
+    <!-- 脚本引入 -->
+    <script src="libs/three.min.js"></script>
+    <script src="src/sound.js"></script>
+    <script src="src/track.js"></script>
+    <script src="src/car.js"></script>
+    <script src="src/physics.js"></script>
+    <script src="src/main.js"></script>
+</body>
+</html>
